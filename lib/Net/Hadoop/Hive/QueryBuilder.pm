@@ -12,7 +12,7 @@ use Data::SExpression;
 use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 
 # (query
-#  (fields (field yyyymmdd) (hash (parse_agent (field agent)) (string "category")) (count (field *)))
+#  (select (field yyyymmdd) (hash (parse_agent (field agent)) (string "category")) (count (field *)))
 #  (from (table access_log))
 #  (where
 #   (and
@@ -22,8 +22,8 @@ use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 #     (= (field yyyymmdd) (string "20120401"))
 #     (= (hash (parse_agent (field agent)) (string "category")) (string "smartphone")))))
 #  (aggregate
-#   (group (fields (field yyyymmdd) (hash (parse_agent (field agent)) (string "category"))))
-#   (order (fields (asc (field yyyymmdd)) (desc (count (field *)))))
+#   (group (field yyyymmdd) (hash (parse_agent (field agent)) (string "category")))
+#   (order (field yyyymmdd) (desc (count (field *))))
 #   (limit 30)))
 # ;; (count (field *))
 # ;; (count (field hoge))
@@ -31,16 +31,19 @@ use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 # ;; (count (if (= (field status) (number 500)) (number 1) (null)))
 
 sub new {
-    my ($this, $s_expression_string, %opts) = @_;
+    my ($this, %opts) = @_;
     my $ds = Data::SExpression->new({use_symbol_class => 1});
+    my $plugin_modules = $opts{plugin_modules} || 'Net::Hadoop::Hive::QueryBuilder::DefaultPlugins';
     my $plugins = $opts{plugins} || [];
     my $plugin_map = {};
+    foreach my $m (@{$plugin_modules}) {
+        push @{$plugins}, @{$m->plugins()};
+    }
     foreach my $p (@$plugins) {
-        $plugin_map{$p->{name}} = $p;
+        $plugin_map->{$p->{name}} = $p;
     }
     return bless +{
         parser => $ds,
-        expression => $s_expression_string,
         plugin_map => $plugin_map,
         aliases => [],
         alias_map => {},
@@ -68,10 +71,14 @@ sub type {
     $self->{plugin_map}->{$name}->{type};
 }
 
+sub node_name {
+    my ($self, $tree) = @_;
+    $tree->[0]->name;
+}
+
 sub node_type {
     my ($self, $tree) = @_;
-    my $name = $tree->[0]->name;
-    $self->type($name);
+    $self->type($self->node_name($tree));
 }
 
 sub produce {
@@ -80,7 +87,7 @@ sub produce {
     unless (ref($car) and ref($car) eq 'Data::SExpression::Symbol') {
         die "all of 'car' must be symbol";
     }
-    $self->proc($sym->name)->($self, @$tree);
+    $self->proc($car->name)->($self, @$tree);
 }
 
 sub add_alias {
@@ -113,12 +120,13 @@ sub table_alias {
 
 sub dump {
     my $self = shift;
+    my $exp = shift;
     my $q;
     try {
-        $q = $self->{parser}->read($self->{expression});
+        $q = $self->{parser}->read($exp);
     } catch {
         $q = undef;
-        $self->{error} = "S-expression parse error";
+        $self->{error} = "S-expression parse error:" . $_;
     };
     return undef unless $q;
 
@@ -127,6 +135,9 @@ sub dump {
         $self->{error} = "toplevel is not 'query'";
         return undef;
     }
+    #TODO: utility to traverse node tree for total_checker
+    #TODO: total_checker (ex: consistency between 'fields' and 'group', and so on...)
+
     my $result;
     try {
         $result = $self->produce($q);

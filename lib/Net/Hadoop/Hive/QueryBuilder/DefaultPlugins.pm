@@ -8,12 +8,14 @@ our $VERSION = "0.1";
 
 use Try::Tiny;
 
+use Net::Hadoop::Hive::QueryBuilder::Operators;
+use Net::Hadoop::Hive::QueryBuilder::Functions;
+
 sub plugins {
     +[
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
+        @{query_structure()},
+        @{Net::Hadoop::Hive::QueryBuilder::Operators::builtin_operators()},
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::builtin_functions()},
     ];
 }
 
@@ -32,16 +34,31 @@ sub query_structure {
         { type => 'f', name => 'string', proc => \&string },
         { type => 'f', name => 'number', proc => \&number },
         { type => 'f', name => 'table', proc => \&table },
-        { type => 's', name => 'fields', proc => \&fields },
+        { type => 'g', name => 'select', proc => \&select_statement },
         { type => 'g', name => 'from', proc => \&from },
         { type => 'g', name => 'where', proc => \&where },
         { type => 'g', name => 'aggregate', proc => \&aggregate },
         { type => 'g', name => 'group', proc => \&group },
+        { type => 'g', name => 'sort', proc => \&sort },
+        { type => 'g', name => 'distribute', proc => \&distribute },
+        { type => 'g', name => 'cluster', proc => \&cluster },
         { type => 'g', name => 'order', proc => \&order },
+        { type => 'f', name => 'asc', proc => \&asc },
+        { type => 'f', name => 'desc', proc => \&desc },
         { type => 'g', name => 'limit', proc => \&limit },
         { type => 'q', name => 'query', proc => \&query },
     ];
 }
+
+sub plugin_proc {
+    my $name = shift;
+    foreach my $p (@{query_structure()}) {
+        if ($p->{name} eq $name) {
+            return $p->{proc};
+        }
+    }
+    return undef;
+};
 
 sub true { 'TRUE'; }
 
@@ -59,7 +76,7 @@ sub string {
     my $c = "$str";
     $c =~ s/\\/\\\\/g;
     $c =~ s/'/\\'/g;
-    $c;
+    "'$c'";
 }
 
 sub number {
@@ -72,7 +89,7 @@ sub table {
     $table_sym->name;
 }
 
-sub fields {
+sub select_statement {
     my ($builder,@args) = @_;
     my @fields = ();
     foreach my $arg (@args) {
@@ -97,10 +114,11 @@ sub from {
         die "now we cannot use join...";
     }
     my $arg = $args[0];
-    if ($arg->[0]->name eq 'table') {
+    my $name = $builder->node_name($arg);
+    if ($name eq 'table') {
         return 'FROM ' . $builder->produce($arg);
     }
-    elsif ($arg->[0]->name eq 'query') {
+    elsif ($name eq 'query') {
         my @lines = ('FROM (');
         my $subquery = $builder->produce($arg);
         my $alias = $builder->add_table_alias($subquery);
@@ -135,70 +153,98 @@ sub where {
 }
 
 sub aggregate {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        return '';
+    }
+    my @aggregate_clauses = qw(sort distribute cluster order limit);
+    my @lines = ();
+    foreach my $arg (@args) {
+        my $type = $builder->node_type($arg);
+        my $name = $builder->node_name($arg);
+        unless ($type eq 'g') {
+            die "invalid node type under 'aggregate':" . $type;
+        }
+        if (scalar(grep {$name eq $_} @aggregate_clauses) < 1) {
+            die "unknown node name under 'aggregate':" . $$name;
+        }
+        push @lines, $builder->produce($arg);
+    }
+    join("\n", @lines);
 }
 
 sub group {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        die "blank 'group' is invalid";
+    }
+    'GROUP BY ' . join(', ', map {$builder->produce($_)} @args);
+}
+
+sub sort {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        die "blank 'sort' is invalid";
+    }
+    'SORT BY ' . join(', ', map {$builder->produce($_)} @args);
+}
+
+sub distribute {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        die "blank 'distribute' is invalid";
+    }
+    'DISTRIBUTE BY ' . join(', ', map {$builder->produce($_)} @args);
+}
+
+sub cluster {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        die "blank 'cluster' is invalid";
+    }
+    'CLUSTER BY ' . join(', ', map {$builder->produce($_)} @args);
 }
 
 sub order {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 1) {
+        die "blank 'order' is invalid";
+    }
+    'ORDER BY ' . join(', ', map {$builder->produce($_)} @args);
+}
+
+sub asc {
+    my ($builder, $arg) = @_;
+    unless ($arg) {
+        die "blank 'asc' is invalid";
+    }
+    $builder->produce($arg) . ' ASC';
+}
+
+sub desc {
+    my ($builder, $arg) = @_;
+    unless ($arg) {
+        die "blank 'desc' is invalid";
+    }
+    $builder->produce($arg) . ' DESC';
 }
 
 sub limit {
+    my ($builder, $arg) = @_;
+    unless ($arg =~ m!^\d+$!) {
+        die "'limit' accepts only one interger";
+    }
+    "LIMIT $arg";
 }
 
 sub query {
-}
-
-# operators
-
-sub builtin_operators {
-    +[
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-    ];
-}
-
-sub in_operator {
-}
-
-sub and_operator {
-}
-
-sub or_operator {
-}
-
-sub equal_operator {
-}
-
-sub plus_operator {
-}
-
-sub minus_operator {
-}
-
-# functions
-
-sub builtin_functions {
-    +[
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-        {name => '', proc => \&},
-    ];
-}
-
-sub hash {
-}
-
-sub array {
-}
-
-sub if_function {
-}
-
-sub count {
+    my ($builder, @args) = @_;
+    foreach my $args (@args) {
+        unless ($builder->node_type($args) eq 'g') {
+            die "query accepts only grammer type(g) nodes";
+        }
+    }
+    join("\n", map { $builder->produce($_) } @args);
 }
 
 1;
