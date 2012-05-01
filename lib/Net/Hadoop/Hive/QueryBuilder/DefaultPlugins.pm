@@ -92,10 +92,11 @@ sub table {
 sub select_statement {
     my ($builder,@args) = @_;
     my @fields = ();
+    my @bare_fields = qw(null true false string number field);
     foreach my $arg (@args) {
-        my $name = $arg->name;
+        my $name = $builder->node_name($arg);
 
-        if ($name eq 'null' or $name eq 'string' or $name eq 'number' or $name eq 'field') {
+        if (scalar(grep {$_ eq $name} @bare_fields) > 0) {
             push @fields, $builder->produce($arg);
             next;
         }
@@ -104,7 +105,7 @@ sub select_statement {
         my $alias = $builder->add_alias($f);
         push @fields, "$f AS $alias";
     }
-    join(", ", @fields);
+    'SELECT ' . join(", ", @fields);
 }
 
 sub from {
@@ -157,7 +158,7 @@ sub aggregate {
     if (scalar(@args) < 1) {
         return '';
     }
-    my @aggregate_clauses = qw(sort distribute cluster order limit);
+    my @aggregate_clauses = qw(group sort distribute cluster order limit);
     my @lines = ();
     foreach my $arg (@args) {
         my $type = $builder->node_type($arg);
@@ -166,7 +167,7 @@ sub aggregate {
             die "invalid node type under 'aggregate':" . $type;
         }
         if (scalar(grep {$name eq $_} @aggregate_clauses) < 1) {
-            die "unknown node name under 'aggregate':" . $$name;
+            die "unknown node name under 'aggregate':" . $name;
         }
         push @lines, $builder->produce($arg);
     }
