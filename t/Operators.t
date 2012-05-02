@@ -71,4 +71,26 @@ subtest 'in' => sub {
         "c1 IN (TRUE, (1=1))");
 };
 
+subtest 'not' => sub {
+    is (pp('not')->($bb, [ss('field'), ss('c1')]), "NOT c1");
+    is (pp('not')->($bb, [ss('='), [ss('field'), ss('c1')], [ss('field'), ss('c2')]]), "NOT (c1=c2)");
+};
+
+$bb = bb(
+    {name => 'table', proc => pp('table'), type => 'f'},
+    {name => 'field', proc => pp('field'), type => 'f'},
+    {name => 'string', proc => pp('string'), type => 'f'},
+    {name => 'number', proc => pp('number'), type => 'f'},
+    {name => 'null', proc => pp('null'), type => 'f'},
+    {name => 'true', proc => pp('true'), type => 'f'},
+    {name => 'false', proc => pp('false'), type => 'f'},
+    {name => '=', proc => pp('='), type => 's'},
+    {name => '!=', proc => pp('!='), type => 's'},
+    {name => 'not', proc => pp('not'), type => 's'},
+);
+
+subtest 'not_with_sentence' => sub {
+    is (pp('not')->($bb, [ss('not'), [ss('true')]]), "NOT (NOT TRUE)");
+};
+
 done_testing();

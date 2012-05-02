@@ -103,6 +103,21 @@ sub in_operator {
 }
 
 sub not_operator {
+    my ($builder,@args) = @_;
+    if (scalar(@args) != 1) {
+        die "'not' accepts just 1 argument";
+    }
+    my $arg = shift @args;
+    my $type = $builder->node_type($arg);
+    if ($type eq 'f') {
+        return 'NOT ' . $builder->produce($arg);
+    }
+    elsif ($type eq 's') {
+        return 'NOT (' . $builder->produce($arg) . ')';
+    }
+    else {
+       die "'not' accepts formula or sentence";
+    }
 }
 
 sub and_operator {
