@@ -10,6 +10,16 @@ sub builtin_functions {
     [];
 }
 
+sub plugin_proc {
+    my $name = shift;
+    foreach my $p (@{builtin_functions()}) {
+        if ($p->{name} eq $name) {
+            return $p->{proc};
+        }
+    }
+    return undef;
+}
+
 sub hash {
 }
 
