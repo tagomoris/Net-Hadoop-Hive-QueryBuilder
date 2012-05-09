@@ -21,6 +21,10 @@ sub builtin_operators {
         { type => 's', name => 'or', proc => \&or_operator },
         { type => 's', name => '+', proc => \&plus_operator },
         { type => 's', name => '-', proc => \&minus_operator },
+        { type => 'f', name => 'map_get', proc => \&map_get },
+        { type => 'f', name => 'map_construct', proc => \&map_construct },
+        { type => 'f', name => 'array_get', proc => \&array_get },
+        { type => 'f', name => 'array_construct', proc => \&array_construct },
     ]
 }
 
@@ -42,19 +46,8 @@ sub equal_operator {
     my ($a1, $a2) = @args;
     my @parts;
     my $sep = ($builder->node_name($a2) eq 'null' ? ' IS ' : '=');
-    foreach $a ($a1, $a2) {
-        my $type = $builder->node_type($a);
-        if ($type eq 'f') {
-            push @parts, $builder->produce($a);
-        }
-        elsif ($type eq 's') {
-            push @parts, '(' . $builder->produce($a) . ')';
-        }
-        else {
-            die "'=' accepts formula or sentence";
-        }
-    }
-    join($sep, @parts);
+
+    $builder->produce_value($a1) . $sep . $builder->produce_value($a2);
 }
 
 sub notequal_operator {
@@ -65,19 +58,8 @@ sub notequal_operator {
     my ($a1, $a2) = @args;
     my @parts;
     my $sep = ($builder->node_name($a2) eq 'null' ? ' IS NOT ' : '!=');
-    foreach $a ($a1, $a2) {
-        my $type = $builder->node_type($a);
-        if ($type eq 'f') {
-            push @parts, $builder->produce($a);
-        }
-        elsif ($type eq 's') {
-            push @parts, '(' . $builder->produce($a) . ')';
-        }
-        else {
-            die "'=' accepts formula or sentence";
-        }
-    }
-    join($sep, @parts);
+
+    $builder->produce_value($a1) . $sep . $builder->produce_value($a2);
 }
 
 sub in_operator {
@@ -86,20 +68,7 @@ sub in_operator {
         die "'in' accepts 2 or more arguments";
     }
     my ($first, @lest) = @args;
-    my @parts;
-    foreach my $p (@lest) {
-        my $type = $builder->node_type($p);
-        if ($type eq 'f') {
-            push @parts, $builder->produce($p);
-        }
-        elsif ($type eq 's') {
-            push @parts, '(' . $builder->produce($p) . ')';
-        }
-        else {
-            die "'in' accepts formula or sentence";
-        }
-    }
-    $builder->produce($first) . ' IN (' . join(', ', @parts) . ')';
+    $builder->produce($first) . ' IN (' . join(', ', map { $builder->produce_value($_) } @lest) . ')';
 }
 
 sub not_operator {
@@ -108,22 +77,55 @@ sub not_operator {
         die "'not' accepts just 1 argument";
     }
     my $arg = shift @args;
-    my $type = $builder->node_type($arg);
-    if ($type eq 'f') {
-        return 'NOT ' . $builder->produce($arg);
-    }
-    elsif ($type eq 's') {
-        return 'NOT (' . $builder->produce($arg) . ')';
-    }
-    else {
-       die "'not' accepts formula or sentence";
-    }
+    'NOT ' . $builder->produce_value($arg);
 }
 
 sub and_operator {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 2) {
+        die "'and' accepts 2 or more arguments";
+    }
+    join(' AND ', map { $builder->produce_value($_) } @args);
 }
 
 sub or_operator {
+    my ($builder,@args) = @_;
+    if (scalar(@args) < 2) {
+        die "'or' accepts 2 or more arguments";
+    }
+    join(' OR ', map { $builder->produce_value($_) } @args);
+}
+
+# map/array constructor is function, but... hmmm
+sub map_construct {
+    my ($builder,@args) = @_;
+    if (scalar(@args) % 2 != 0) {
+        die "'map_construct' needs key-value pairs (but odd number arguments)"
+    }
+    'map(' . join(', ', map { $builder->produce_value($_) } @args ) . ')';
+}
+
+sub array_construct {
+    my ($builder,@args) = @_;
+    'array(' . join(', ', map { $builder->produce_value($_) } @args ) . ')';
+}
+
+sub map_get {
+    my ($builder,@args) = @_;
+    if (scalar(@args) != 2) {
+        die "'map_get' accepts just 2 arguments";
+    }
+    my ($hash, $key) = @args;
+    $builder->produce_value($hash) . '[' . $builder->produce_value($key) . ']'
+}
+
+sub array_get {
+    my ($builder,@args) = @_;
+    if (scalar(@args) != 2) {
+        die "'array_get' accepts just 2 arguments";
+    }
+    my ($array, $index) = @args;
+    $builder->produce_value($array) . '[' . $builder->produce_value($index) . ']'
 }
 
 sub plus_operator {

@@ -12,7 +12,7 @@ use Data::SExpression;
 use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 
 # (query
-#  (select (field yyyymmdd) (hash (parse_agent (field agent)) (string "category")) (count (field *)))
+#  (select (field yyyymmdd) (map_get (parse_agent (field agent)) (string "category")) (count *))
 #  (from (table access_log))
 #  (where
 #   (and
@@ -25,7 +25,7 @@ use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 #   (group (field yyyymmdd) (hash (parse_agent (field agent)) (string "category")))
 #   (order (field yyyymmdd) (desc (count (field *))))
 #   (limit 30)))
-# ;; (count (field *))
+# ;; (count *)
 # ;; (count (field hoge))
 # ;; (count (is_smartphone(parse_agent(agent))))
 # ;; (count (if (= (field status) (number 500)) (number 1) (null)))
@@ -33,7 +33,7 @@ use Net::Hadoop::Hive::QueryBuilder::DefaultPlugins;
 sub new {
     my ($this, %opts) = @_;
     my $ds = Data::SExpression->new({use_symbol_class => 1});
-    my $plugin_modules = $opts{plugin_modules} || 'Net::Hadoop::Hive::QueryBuilder::DefaultPlugins';
+    my $plugin_modules = $opts{plugin_modules} || ['Net::Hadoop::Hive::QueryBuilder::DefaultPlugins'];
     my $plugins = $opts{plugins} || [];
     my $plugin_map = {};
     foreach my $m (@{$plugin_modules}) {
@@ -63,12 +63,14 @@ sub error {
 
 sub proc {
     my ($self, $name) = @_;
-    $self->{plugin_map}->{$name}->{proc};
+    $self->{plugin_map}->{$name}->{proc}
+        or croak "unknown plugin type for name:" . $name;
 }
 
 sub type {
     my ($self, $name) = @_;
-    $self->{plugin_map}->{$name}->{type};
+    $self->{plugin_map}->{$name}->{type}
+        or croak "unknown plugin type for name:" . $name;
 }
 
 sub node_name {
@@ -81,13 +83,35 @@ sub node_type {
     $self->type($self->node_name($tree));
 }
 
+sub produce_value {
+    my ($self, $tree) = @_;
+    my $car = shift @$tree; # tree is cdr
+    unless (ref($car) and ref($car) eq 'Data::SExpression::Symbol') {
+        croak "all of 'car' must be symbol";
+    }
+    my $type = $self->type($car->name);
+    if ($type eq 'f') {
+        return $self->proc($car->name)->($self, @$tree);
+    }
+    elsif ($type eq 's') {
+        return '(' . $self->proc($car->name)->($self, @$tree) . ')';
+    }
+    croak "argument node " . $car->name . " type is invalid: " . $type;
+}
+
 sub produce {
     my ($self, $tree) = @_;
     my $car = shift @$tree; # tree is cdr
     unless (ref($car) and ref($car) eq 'Data::SExpression::Symbol') {
-        die "all of 'car' must be symbol";
+        croak "all of 'car' must be symbol";
     }
     $self->proc($car->name)->($self, @$tree);
+}
+
+sub produce_or_alias {
+    my ($self, $tree) = @_;
+    my $exp = $self->produce($tree);
+    $self->alias($exp) or $exp;
 }
 
 sub add_alias {

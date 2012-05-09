@@ -211,7 +211,7 @@ sub order {
     if (scalar(@args) < 1) {
         die "blank 'order' is invalid";
     }
-    'ORDER BY ' . join(', ', map {$builder->produce($_)} @args);
+    'ORDER BY ' . join(', ', map {$builder->produce_or_alias($_)} @args);
 }
 
 sub asc {
@@ -219,7 +219,7 @@ sub asc {
     unless ($arg) {
         die "blank 'asc' is invalid";
     }
-    $builder->produce($arg) . ' ASC';
+    $builder->produce_or_alias($arg) . ' ASC';
 }
 
 sub desc {
@@ -227,7 +227,7 @@ sub desc {
     unless ($arg) {
         die "blank 'desc' is invalid";
     }
-    $builder->produce($arg) . ' DESC';
+    $builder->produce_or_alias($arg) . ' DESC';
 }
 
 sub limit {
