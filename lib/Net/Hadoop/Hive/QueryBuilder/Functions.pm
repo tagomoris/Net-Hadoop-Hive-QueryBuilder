@@ -13,9 +13,25 @@ use Data::SExpression::Symbol;
 # g: grammer (hql reserved word)
 # q: query
 
+use Net::Hadoop::Hive::QueryBuilder::Functions::Mathematical;
+use Net::Hadoop::Hive::QueryBuilder::Functions::Collection;
+use Net::Hadoop::Hive::QueryBuilder::Functions::Data;
+use Net::Hadoop::Hive::QueryBuilder::Functions::String;
+#use Net::Hadoop::Hive::QueryBuilder::Functions::XPath;
+use Net::Hadoop::Hive::QueryBuilder::Functions::Aggregate;
+
 sub builtin_functions {
     +[
-        { type => 'f', name => 'count', proc => \&count },
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::Mathematical::functions()},
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::Collection::functions()},
+        { type => 'f', name => 'cast', proc => \&cast },
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::Data::functions()},
+        { type => 'f', name => 'if', proc => \&if_function },
+        { type => 'f', name => 'coalesce', proc => \&coalesce },
+        { type => 'f', name => 'case', proc => \&case_function },
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::String::functions()},
+#        @{Net::Hadoop::Hive::QueryBuilder::Functions::XPath::functions()},
+        @{Net::Hadoop::Hive::QueryBuilder::Functions::Aggregate::functions()},
     ]
 }
 
@@ -29,31 +45,39 @@ sub plugin_proc {
     return undef;
 }
 
-sub count {
-    # (count *)
-    # (count (expr))
-    # (count distinct (expr) (expr) ...)
-    my ($builder,@args) = @_;
-    if (scalar(@args) < 2) {
-        my $arg = shift @args;
-        if (ref($arg) eq 'Data::SExpression::Symbol') {
-            die "invalid bareword for count argument" . $arg->name unless $arg->name eq '*';
-            return 'COUNT(*)';
-        }
-        return 'COUNT(' . $builder->produce_value($arg) . ')';
-    }
-    # len(args) >= 2
-    my ($distinct, @lest) = @args;
-    unless (ref($distinct) eq 'Data::SExpression::Symbol' and $distinct->name eq 'distinct') {
-        die "count with 2 or more arguments allowed only with 'distinct'";
-    }
-    unless (scalar(@lest) > 0) {
-        die "count distinct needs 1 or more arguments";
-    }
-    'COUNT(DISTINCT ' . join(', ', map { $builder->produce_value($_) } @lest) . ')';
+# type conversion
+
+sub cast {
 }
 
+# conditional functions
+
 sub if_function {
+}
+
+sub coalesce {
+}
+
+sub case_function {
+    # for when and else, try hard in this function only....
+}
+
+# private
+sub when_function {
+}
+# private
+sub else_function {
+}
+
+# table generating functions
+
+sub explode {
+}
+
+sub json_tuple {
+}
+
+sub parse_url_tuple {
 }
 
 1;

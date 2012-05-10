@@ -22,10 +22,18 @@ my @defset = (
 );
 my $bb = bb(@defset);
 
-subtest 'count' => sub {
-    is (pp('count')->($bb, ss('*')), "COUNT(*)");
-    is (pp('count')->($bb, [ss('field'), ss('col1')]), "COUNT(col1)");
-    is (pp('count')->($bb, ss('distinct'), [ss('field'), ss('col1')], [ss('field'), ss('col2')]), "COUNT(DISTINCT col1, col2)");
-};
+subtest 'cast' => sub { is(1,1); };
+
+subtest 'if' => sub { is(1,1); };
+
+subtest 'coalesce' => sub { is(1,1); };
+
+subtest 'case' => sub { is(1,1); };
+
+subtest 'explode' => sub { is(1,1); };
+
+subtest 'json_tuple' => sub { is(1,1); };
+
+subtest 'parse_url_tuple' => sub { is(1,1); };
 
 done_testing();
