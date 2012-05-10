@@ -34,7 +34,7 @@ EOQ
     my $query_hql = <<EOQ
 SELECT yyyymmdd, agentdata['category'] AS f1, COUNT(*) AS f2
 FROM access_log
-WHERE (service='blog') AND ((yyyymmdd='20120331') OR (yyyymmdd='20120401') OR (agentdata['category']='smartphone'))
+WHERE (service = 'blog') AND ((yyyymmdd = '20120331') OR (yyyymmdd = '20120401') OR (agentdata['category'] = 'smartphone'))
 GROUP BY yyyymmdd, agentdata['category']
 ORDER BY yyyymmdd, f2 DESC
 LIMIT 30
