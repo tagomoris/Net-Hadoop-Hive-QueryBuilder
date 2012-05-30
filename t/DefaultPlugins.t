@@ -22,7 +22,8 @@ subtest 'true, false, null' => sub {
 subtest 'field, string, number, table' => sub {
     is (pp('field')->($bb, ss('hoge')), 'hoge');
     is (pp('string')->($bb, ss('hoge')), "'hoge'");
-    is (pp('number')->($bb, ss('10')), '10');
+    is (pp('number')->($bb, 10), '10');
+    is (pp('number')->($bb, '22.3'), '22.3');
     is (pp('number')->($bb, ss('22.3')), '22.3');
     is (pp('table')->($bb, ss('hoge_tbl')), 'hoge_tbl');
 };

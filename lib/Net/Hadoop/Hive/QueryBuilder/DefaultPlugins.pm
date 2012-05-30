@@ -81,7 +81,7 @@ sub string {
 
 sub number {
     my ($builder,$num) = @_;
-    $num->name;
+    "$num";
 }
 
 sub table {
