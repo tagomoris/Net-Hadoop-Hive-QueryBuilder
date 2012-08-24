@@ -1,7 +1,7 @@
 extlib
 blib
 pm_to_blib
-MANIFEST
+# MANIFEST
 Makefile
 MyMETA*
 META*
